@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Calculadora de Líquido</title>
+<style>
+  :root {
+    --bg: #f2f2f7;
+    --card: #ffffff;
+    --text: #1c1c1e;
+    --muted: #6e6e73;
+    --separator: rgba(60, 60, 67, 0.14);
+    --field: #f2f2f7;
+    --accent: #007aff;
+    --accent-press: #0062cc;
+    --positive: #248a3d;
+    --warning: #d70015;
+    --badge-bg: rgba(0, 122, 255, 0.12);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000;
+      --card: #1c1c1e;
+      --text: #f5f5f7;
+      --muted: #98989d;
+      --separator: rgba(84, 84, 88, 0.6);
+      --field: #2c2c2e;
+      --accent: #0a84ff;
+      --accent-press: #409cff;
+      --positive: #30d158;
+      --warning: #ff453a;
+      --badge-bg: rgba(10, 132, 255, 0.2);
+      --shadow: none;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font: 100%/1.5 -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: max(24px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+  }
+  main { max-width: 440px; margin: 0 auto; }
+
+  h1 {
+    font-size: 2rem;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+    margin: 8px 4px 20px;
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  label.caption, .caption {
+    display: block;
+    font-size: 0.8125rem;
+    color: var(--muted);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+
+  .money-field {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-top: 6px;
+    background: var(--field);
+    border-radius: 12px;
+    padding: 12px 14px;
+    transition: box-shadow 150ms ease-out;
+  }
+  .money-field:focus-within { box-shadow: 0 0 0 3px var(--badge-bg), 0 0 0 1px var(--accent) inset; }
+  .money-field span { color: var(--muted); font-weight: 500; }
+  .money-field input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+  }
+  #gross { font-size: 1.75rem; font-weight: 600; letter-spacing: -0.01em; }
+  #gross::placeholder { color: var(--muted); opacity: 0.5; }
+
+  .hero { text-align: center; padding: 28px 20px; }
+  .hero .value {
+    font-size: clamp(2.25rem, 11vw, 3rem);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    margin-top: 4px;
+    color: var(--positive);
+    transition: color 200ms ease-out;
+  }
+  .hero .value.empty { color: var(--muted); }
+  .hero .value.negative { color: var(--warning); }
+  .hero .share { margin-top: 6px; color: var(--muted); font-size: 0.9375rem; }
+
+  .rows { list-style: none; margin: 0; padding: 0; }
+  .rows li {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--separator);
+  }
+  .rows li:first-child { padding-top: 0; }
+  .rows li:last-child { border-bottom: 0; padding-bottom: 0; }
+  .rows .label small { display: block; color: var(--muted); font-size: 0.8125rem; }
+  .rows .amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rows li.total { font-weight: 600; }
+
+  .actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  button {
+    font: inherit;
+    font-weight: 500;
+    border: 0;
+    border-radius: 10px;
+    padding: 10px 14px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--accent);
+    transition: transform 100ms ease-out, background-color 100ms ease-out;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:active { transform: scale(0.97); background: var(--badge-bg); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button .chevron { display: inline-block; transition: transform 300ms cubic-bezier(0.25, 1, 0.5, 1); }
+  button[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+
+  .badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--badge-bg);
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .badge[hidden] { display: none; }
+  #toggle { margin-left: -14px; }
+
+  .disclosure {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition: grid-template-rows 300ms cubic-bezier(0.25, 1, 0.5, 1), opacity 200ms ease-out;
+  }
+  .disclosure.open { grid-template-rows: 1fr; opacity: 1; }
+  .disclosure > div { overflow: hidden; }
+  .editor { padding-top: 12px; display: grid; gap: 14px; }
+  .editor .money-field { padding: 10px 12px; }
+  .editor .restore { justify-self: start; padding-left: 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .disclosure { transition: opacity 150ms ease; }
+    button, button .chevron, .hero .value { transition: none; }
+    button:active { transform: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Quanto sobra</h1>
+
+  <section class="card">
+    <label class="caption" for="gross">Valor recebido (bruto)</label>
+    <div class="money-field">
+      <span>R$</span>
+      <input id="gross" type="text" inputmode="decimal" autocomplete="off" placeholder="0,00" autofocus>
+    </div>
+  </section>
+
+  <section class="card hero" aria-live="polite">
+    <span class="caption">Sobra pra você</span>
+    <div class="value empty" id="net">—</div>
+    <div class="share" id="share">&nbsp;</div>
+  </section>
+
+  <section class="card">
+    <ul class="rows">
+      <li><span class="label">Simples Nacional<small id="rate-label">6%</small></span><span class="amount" id="simples">—</span></li>
+      <li><span class="label">INSS</span><span class="amount" id="inss-out">—</span></li>
+      <li><span class="label">Contabilidade</span><span class="amount" id="fee-out">—</span></li>
+      <li class="total"><span class="label">Total impostos e serviços</span><span class="amount" id="total">—</span></li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <div class="actions">
+      <button type="button" id="toggle" aria-expanded="false" aria-controls="editor-panel">
+        <span class="chevron" aria-hidden="true">›</span> Editar valores
+      </button>
+      <span class="badge" id="badge" hidden>Valores personalizados</span>
+    </div>
+    <div class="disclosure" id="editor-panel" inert>
+      <div>
+        <div class="editor">
+          <div>
+            <label class="caption" for="rate">Simples Nacional</label>
+            <div class="money-field"><input id="rate" type="text" inputmode="decimal" autocomplete="off"><span>%</span></div>
+          </div>
+          <div>
+            <label class="caption" for="inss">INSS</label>
+            <div class="money-field"><span>R$</span><input id="inss" type="text" inputmode="decimal" autocomplete="off"></div>
+          </div>
+          <div>
+            <label class="caption" for="fee">Contabilidade</label>
+            <div class="money-field"><span>R$</span><input id="fee" type="text" inputmode="decimal" autocomplete="off"></div>
+          </div>
+          <button type="button" class="restore" id="restore">Restaurar padrão</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  const DEFAULTS = { rate: 6, inssCents: 18000, feeCents: 29700 };
+  const STORAGE_KEY = 'calculadora-liquido:deductions';
+
+  const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+  const plain = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const pct = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const rateFmt = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 });
+
+  const $ = (id) => document.getElementById(id);
+  const gross = $('gross'), rate = $('rate'), inss = $('inss'), fee = $('fee');
+
+  // Accepts "28.084,65", "28084,65", "28084.65" and "R$ 28.084,65".
+  function parseNumber(raw) {
+    let s = String(raw).replace(/R\$|\s|%/g, '');
+    if (!s) return NaN;
+    if (s.includes(',')) {
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else if (!/^\d+\.\d{1,2}$/.test(s)) {
+      s = s.replace(/\./g, '');
+    }
+    return /^-?\d*\.?\d+$/.test(s) ? Number(s) : NaN;
+  }
+  const toCents = (raw) => {
+    const n = parseNumber(raw);
+    return Number.isFinite(n) ? Math.round(n * 100) : NaN;
+  };
+  const money = (cents) => brl.format(cents / 100);
+
+  function loadDeductions() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (saved && [saved.rate, saved.inssCents, saved.feeCents].every(Number.isFinite)) return saved;
+    } catch (_) { /* storage unavailable: fall back to defaults */ }
+    return { ...DEFAULTS };
+  }
+  function saveDeductions(d) {
+    try {
+      if (isDefault(d)) localStorage.removeItem(STORAGE_KEY);
+      else localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+    } catch (_) { /* ignore */ }
+  }
+  const isDefault = (d) =>
+    d.rate === DEFAULTS.rate && d.inssCents === DEFAULTS.inssCents && d.feeCents === DEFAULTS.feeCents;
+
+  let deductions = loadDeductions();
+
+  function fillEditor() {
+    rate.value = rateFmt.format(deductions.rate);
+    inss.value = plain.format(deductions.inssCents / 100);
+    fee.value = plain.format(deductions.feeCents / 100);
+  }
+
+  function readEditor() {
+    const r = parseNumber(rate.value), i = toCents(inss.value), f = toCents(fee.value);
+    deductions = {
+      rate: Number.isFinite(r) && r >= 0 ? Math.round(r * 100) / 100 : deductions.rate,
+      inssCents: Number.isFinite(i) && i >= 0 ? i : deductions.inssCents,
+      feeCents: Number.isFinite(f) && f >= 0 ? f : deductions.feeCents,
+    };
+    saveDeductions(deductions);
+  }
+
+  function render() {
+    const d = deductions;
+    $('rate-label').textContent = rateFmt.format(d.rate) + '%';
+    $('badge').hidden = isDefault(d);
+
+    const g = toCents(gross.value);
+    const net = $('net');
+    if (!Number.isFinite(g) || g <= 0) {
+      net.textContent = '—';
+      net.className = 'value empty';
+      $('share').innerHTML = '&nbsp;';
+      ['simples', 'inss-out', 'fee-out', 'total'].forEach((id) => ($(id).textContent = '—'));
+      return;
+    }
+
+    const simples = Math.round((g * d.rate) / 100);
+    const total = simples + d.inssCents + d.feeCents;
+    const netCents = g - total;
+
+    $('simples').textContent = money(simples);
+    $('inss-out').textContent = money(d.inssCents);
+    $('fee-out').textContent = money(d.feeCents);
+    $('total').textContent = money(total);
+    net.textContent = money(netCents);
+    net.className = 'value' + (netCents < 0 ? ' negative' : '');
+    $('share').textContent = pct.format((total / g) * 100) + '% vai para impostos e serviços';
+  }
+
+  gross.addEventListener('input', render);
+  gross.addEventListener('blur', () => {
+    const c = toCents(gross.value);
+    if (Number.isFinite(c)) gross.value = plain.format(c / 100);
+  });
+
+  [rate, inss, fee].forEach((el) => {
+    el.addEventListener('input', () => { readEditor(); render(); });
+    el.addEventListener('blur', fillEditor);
+  });
+
+  $('toggle').addEventListener('click', (e) => {
+    const btn = e.currentTarget;
+    const open = btn.getAttribute('aria-expanded') !== 'true';
+    btn.setAttribute('aria-expanded', String(open));
+    const panel = $('editor-panel');
+    panel.classList.toggle('open', open);
+    panel.inert = !open;
+    if (open) rate.focus({ preventScroll: true });
+  });
+
+  $('restore').addEventListener('click', () => {
+    deductions = { ...DEFAULTS };
+    saveDeductions(deductions);
+    fillEditor();
+    render();
+  });
+
+  fillEditor();
+  render();
+  gross.focus();
+</script>
+</body>
+</html>
