@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
+<script>
+  // Apply the saved theme before first paint so there is no flash.
+  try {
+    const t = localStorage.getItem('calculadora-liquido:theme');
+    if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+  } catch (_) {}
+</script>
 <title>Calculadora de Líquido</title>
 <style>
   :root {
@@ -19,9 +26,12 @@
     --warning: #d70015;
     --badge-bg: rgba(0, 122, 255, 0.12);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+    --sheet: rgba(255, 255, 255, 0.82);
+    --scrim: rgba(0, 0, 0, 0.28);
+    --grabber: rgba(60, 60, 67, 0.3);
   }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       --bg: #000000;
       --card: #1c1c1e;
       --text: #f5f5f7;
@@ -34,8 +44,31 @@
       --warning: #ff453a;
       --badge-bg: rgba(10, 132, 255, 0.2);
       --shadow: none;
+      --sheet: rgba(28, 28, 30, 0.82);
+      --scrim: rgba(0, 0, 0, 0.5);
+      --grabber: rgba(235, 235, 245, 0.3);
+      color-scheme: dark;
     }
   }
+  :root[data-theme="dark"] {
+    --bg: #000000;
+    --card: #1c1c1e;
+    --text: #f5f5f7;
+    --muted: #98989d;
+    --separator: rgba(84, 84, 88, 0.6);
+    --field: #2c2c2e;
+    --accent: #0a84ff;
+    --accent-press: #409cff;
+    --positive: #30d158;
+    --warning: #ff453a;
+    --badge-bg: rgba(10, 132, 255, 0.2);
+    --shadow: none;
+    --sheet: rgba(28, 28, 30, 0.82);
+    --scrim: rgba(0, 0, 0, 0.5);
+    --grabber: rgba(235, 235, 245, 0.3);
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] { color-scheme: light; }
 
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
@@ -47,16 +80,30 @@
     font: 100%/1.5 -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     padding: max(24px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+    transition: background-color 250ms ease, color 250ms ease;
   }
   main { max-width: 440px; margin: 0 auto; }
 
+  header { display: flex; justify-content: space-between; align-items: center; margin: 8px 4px 20px; }
   h1 {
     font-size: 2rem;
     line-height: 1.1;
     letter-spacing: -0.02em;
     font-weight: 700;
-    margin: 8px 4px 20px;
+    margin: 0;
   }
+  .icon-btn {
+    width: 40px; height: 40px; padding: 0;
+    display: grid; place-items: center;
+    border-radius: 50%;
+    background: var(--card);
+    box-shadow: var(--shadow);
+    color: var(--text);
+  }
+  .icon-btn svg { width: 20px; height: 20px; }
+  :root .icon-sun { display: none; }
+  :root[data-theme="dark"] .icon-sun { display: block; }
+  :root[data-theme="dark"] .icon-moon { display: none; }
 
   .card {
     background: var(--card);
@@ -145,8 +192,6 @@
   }
   button:active { transform: scale(0.97); background: var(--badge-bg); }
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  button .chevron { display: inline-block; transition: transform 300ms cubic-bezier(0.25, 1, 0.5, 1); }
-  button[aria-expanded="true"] .chevron { transform: rotate(90deg); }
 
   .badge {
     font-size: 0.75rem;
@@ -160,28 +205,90 @@
   .badge[hidden] { display: none; }
   #toggle { margin-left: -14px; }
 
-  .disclosure {
-    display: grid;
-    grid-template-rows: 0fr;
-    opacity: 0;
-    transition: grid-template-rows 300ms cubic-bezier(0.25, 1, 0.5, 1), opacity 200ms ease-out;
+  /* Drawer: slides in from the right on wide screens, up from the bottom on phones. */
+  .scrim {
+    position: fixed; inset: 0;
+    background: var(--scrim);
+    opacity: 0; visibility: hidden;
+    transition: opacity 300ms ease, visibility 0s linear 300ms;
+    z-index: 10;
   }
-  .disclosure.open { grid-template-rows: 1fr; opacity: 1; }
-  .disclosure > div { overflow: hidden; }
-  .editor { padding-top: 12px; display: grid; gap: 14px; }
+  .drawer {
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+    position: fixed;
+    z-index: 11;
+    background: var(--sheet);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+    box-shadow: 0 0 0 0.5px var(--separator), 0 16px 48px rgba(0, 0, 0, 0.18);
+    display: flex; flex-direction: column;
+    visibility: hidden;
+    transition: transform 420ms var(--ease), visibility 0s linear 420ms;
+    overscroll-behavior: contain;
+  }
+  .drawer.open, .scrim.open { visibility: visible; transition-delay: 0s; }
+  .scrim.open { opacity: 1; }
+  .drawer.open { transform: none; }
+  .drawer.dragging { transition: none; }
+
+  .drawer-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 20px 8px;
+    touch-action: none;
+  }
+  .drawer-head h2 { font-size: 1.25rem; letter-spacing: -0.01em; margin: 0; }
+  .drawer-head .done { font-weight: 600; margin-right: -14px; }
+  .grabber { display: none; }
+  .editor { padding: 8px 20px 24px; display: grid; gap: 14px; overflow-y: auto; }
   .editor .money-field { padding: 10px 12px; }
-  .editor .restore { justify-self: start; padding-left: 0; }
+  .editor .restore { justify-self: start; margin-left: -14px; }
+
+  @media (min-width: 640px) {
+    .drawer {
+      top: 0; right: 0; bottom: 0;
+      width: min(380px, 100vw);
+      transform: translateX(100%);
+      border-radius: 20px 0 0 20px;
+      padding-top: env(safe-area-inset-top);
+    }
+  }
+  @media (max-width: 639.98px) {
+    .drawer {
+      left: 0; right: 0; bottom: 0;
+      max-height: 88vh;
+      transform: translateY(100%);
+      border-radius: 20px 20px 0 0;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .grabber {
+      display: block;
+      width: 36px; height: 5px; border-radius: 3px;
+      background: var(--grabber);
+      margin: 8px auto 0;
+    }
+    .drawer-head { padding-top: 8px; cursor: grab; }
+  }
 
   @media (prefers-reduced-motion: reduce) {
-    .disclosure { transition: opacity 150ms ease; }
-    button, button .chevron, .hero .value { transition: none; }
+    body, button, .hero .value { transition: none; }
     button:active { transform: none; }
+    .drawer, .drawer.open { transform: none; opacity: 0; transition: opacity 200ms ease, visibility 0s linear 200ms; }
+    .drawer.open { opacity: 1; transition-delay: 0s; }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .drawer { background: var(--card); -webkit-backdrop-filter: none; backdrop-filter: none; }
   }
 </style>
 </head>
 <body>
 <main>
-  <h1>Quanto sobra</h1>
+  <header>
+    <h1>Quanto sobra</h1>
+    <button type="button" class="icon-btn" id="theme" aria-label="Alternar tema claro/escuro">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+  </header>
 
   <section class="card">
     <label class="caption" for="gross">Valor recebido (bruto)</label>
@@ -208,32 +315,35 @@
 
   <section class="card">
     <div class="actions">
-      <button type="button" id="toggle" aria-expanded="false" aria-controls="editor-panel">
-        <span class="chevron" aria-hidden="true">›</span> Editar valores
-      </button>
+      <button type="button" id="toggle" aria-haspopup="dialog" aria-controls="drawer">Editar valores</button>
       <span class="badge" id="badge" hidden>Valores personalizados</span>
-    </div>
-    <div class="disclosure" id="editor-panel" inert>
-      <div>
-        <div class="editor">
-          <div>
-            <label class="caption" for="rate">Simples Nacional</label>
-            <div class="money-field"><input id="rate" type="text" inputmode="decimal" autocomplete="off"><span>%</span></div>
-          </div>
-          <div>
-            <label class="caption" for="inss">INSS</label>
-            <div class="money-field"><span>R$</span><input id="inss" type="text" inputmode="decimal" autocomplete="off"></div>
-          </div>
-          <div>
-            <label class="caption" for="fee">Contabilidade</label>
-            <div class="money-field"><span>R$</span><input id="fee" type="text" inputmode="decimal" autocomplete="off"></div>
-          </div>
-          <button type="button" class="restore" id="restore">Restaurar padrão</button>
-        </div>
-      </div>
     </div>
   </section>
 </main>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" inert>
+  <div class="grabber" aria-hidden="true"></div>
+  <div class="drawer-head" id="drawer-head">
+    <h2 id="drawer-title">Valores</h2>
+    <button type="button" class="done" id="done">OK</button>
+  </div>
+  <div class="editor">
+    <div>
+      <label class="caption" for="rate">Simples Nacional</label>
+      <div class="money-field"><input id="rate" type="text" inputmode="decimal" autocomplete="off"><span>%</span></div>
+    </div>
+    <div>
+      <label class="caption" for="inss">INSS</label>
+      <div class="money-field"><span>R$</span><input id="inss" type="text" inputmode="decimal" autocomplete="off"></div>
+    </div>
+    <div>
+      <label class="caption" for="fee">Contabilidade</label>
+      <div class="money-field"><span>R$</span><input id="fee" type="text" inputmode="decimal" autocomplete="off"></div>
+    </div>
+    <button type="button" class="restore" id="restore">Restaurar padrão</button>
+  </div>
+</aside>
 
 <script>
   const DEFAULTS = { rate: 6, inssCents: 18000, feeCents: 29700 };
@@ -337,14 +447,87 @@
     el.addEventListener('blur', fillEditor);
   });
 
-  $('toggle').addEventListener('click', (e) => {
-    const btn = e.currentTarget;
-    const open = btn.getAttribute('aria-expanded') !== 'true';
-    btn.setAttribute('aria-expanded', String(open));
-    const panel = $('editor-panel');
-    panel.classList.toggle('open', open);
-    panel.inert = !open;
-    if (open) rate.focus({ preventScroll: true });
+  // --- Drawer -------------------------------------------------------------
+  const drawer = $('drawer'), scrim = $('scrim'), toggle = $('toggle');
+  const isSheet = () => matchMedia('(max-width: 639.98px)').matches;
+
+  function openDrawer() {
+    drawer.inert = false;
+    drawer.classList.add('open');
+    scrim.classList.add('open');
+    document.documentElement.style.overflow = 'hidden';
+    // Wait for the slide to start before focusing, or iOS jumps the page.
+    setTimeout(() => rate.focus({ preventScroll: true }), isSheet() ? 350 : 0);
+  }
+  function closeDrawer() {
+    if (!drawer.classList.contains('open')) return;
+    drawer.style.transform = '';
+    drawer.classList.remove('open', 'dragging');
+    scrim.classList.remove('open');
+    scrim.style.opacity = '';
+    drawer.inert = true;
+    document.documentElement.style.overflow = '';
+    toggle.focus({ preventScroll: true });
+  }
+  toggle.addEventListener('click', openDrawer);
+  $('done').addEventListener('click', closeDrawer);
+  scrim.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
+
+  // Drag the bottom sheet down to dismiss: 1:1 tracking, rubber-band upwards,
+  // and a momentum projection decides between closing and snapping back.
+  (() => {
+    const head = $('drawer-head');
+    let startY = 0, dy = 0, samples = [];
+    const rubber = (x, d) => (x * d * 0.55) / (d + 0.55 * Math.abs(x));
+
+    head.addEventListener('pointerdown', (e) => {
+      if (!isSheet() || e.target.closest('button')) return;
+      head.setPointerCapture(e.pointerId);
+      startY = e.clientY; dy = 0; samples = [{ y: e.clientY, t: e.timeStamp }];
+      drawer.classList.add('dragging');
+    });
+    head.addEventListener('pointermove', (e) => {
+      if (!drawer.classList.contains('dragging')) return;
+      dy = e.clientY - startY;
+      const shown = dy >= 0 ? dy : rubber(dy, drawer.offsetHeight);
+      drawer.style.transform = `translateY(${shown}px)`;
+      scrim.style.opacity = String(Math.max(0, 1 - dy / drawer.offsetHeight));
+      samples.push({ y: e.clientY, t: e.timeStamp });
+      if (samples.length > 5) samples.shift();
+    });
+    const release = () => {
+      if (!drawer.classList.contains('dragging')) return;
+      const a = samples[0], b = samples[samples.length - 1];
+      const v = b && a && b.t > a.t ? ((b.y - a.y) / (b.t - a.t)) * 1000 : 0; // px/s
+      const projected = dy + (v / 1000) * 0.998 / (1 - 0.998);
+      drawer.classList.remove('dragging');
+      if (projected > drawer.offsetHeight / 2) {
+        closeDrawer();
+      } else {
+        drawer.style.transform = '';
+        scrim.style.opacity = '';
+      }
+    };
+    head.addEventListener('pointerup', release);
+    head.addEventListener('pointercancel', release);
+  })();
+
+  // --- Theme --------------------------------------------------------------
+  const THEME_KEY = 'calculadora-liquido:theme';
+  function currentTheme() {
+    return document.documentElement.dataset.theme
+      || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  }
+  function applyTheme(t) {
+    document.documentElement.dataset.theme = t;
+    $('theme').setAttribute('aria-label', t === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro');
+  }
+  applyTheme(currentTheme());
+  $('theme').addEventListener('click', () => {
+    const next = currentTheme() === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    try { localStorage.setItem(THEME_KEY, next); } catch (_) { /* ignore */ }
   });
 
   $('restore').addEventListener('click', () => {

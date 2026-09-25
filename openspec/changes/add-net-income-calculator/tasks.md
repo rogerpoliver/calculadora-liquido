@@ -16,3 +16,8 @@
 
 - [x] 3.1 Create public GitHub repo `rogerpoliver/calculadora-liquido` and push `main`; verify the repo page lists `index.html`
 - [x] 3.2 Enable GitHub Pages on `main` / root; verify `https://rogerpoliver.github.io/calculadora-liquido/` renders the reference month correctly
+
+## 4. Theme and drawer
+
+- [x] 4.1 Add light/dark theme toggle that follows the system by default and persists the choice; verify toggle → reload keeps the theme
+- [x] 4.2 Move deduction editing into a drawer (right side on wide screens, bottom sheet with drag-to-dismiss on phones); verify open/close via OK, scrim, Escape and drag at 1100px and 375px
