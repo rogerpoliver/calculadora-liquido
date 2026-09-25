@@ -14,5 +14,5 @@
 
 ## 3. Publish (only after the owner's explicit go-ahead)
 
-- [ ] 3.1 Create public GitHub repo `rogerpoliver/calculadora-liquido` and push `main`; verify the repo page lists `index.html`
-- [ ] 3.2 Enable GitHub Pages on `main` / root; verify `https://rogerpoliver.github.io/calculadora-liquido/` renders the reference month correctly
+- [x] 3.1 Create public GitHub repo `rogerpoliver/calculadora-liquido` and push `main`; verify the repo page lists `index.html`
+- [x] 3.2 Enable GitHub Pages on `main` / root; verify `https://rogerpoliver.github.io/calculadora-liquido/` renders the reference month correctly
